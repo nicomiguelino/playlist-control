@@ -1,3 +1,5 @@
+import time
+
 import click
 import zmq
 
@@ -5,7 +7,6 @@ import zmq
 @click.command()
 @click.option(
     "--message",
-    type=click.Choice(["previous", "next", "pause", "play"]),
     required=True,
     help="Message to send to the server",
 )
@@ -16,7 +17,6 @@ def main(message):
     socket.connect("tcp://127.0.0.1:5555")
 
     # Give the socket time to establish connection
-    import time
     time.sleep(0.1)
 
     socket.send_string(message)
