@@ -47,16 +47,27 @@ def zmq_listener():
 
             print(f"[zmq-listener] Received message: {message}")
 
-            # Send to web app
-            try:
-                encoded_message = quote(message)
-                url = f"{WEB_APP_URL}/message?message={encoded_message}"
-                response = requests.post(url)
-                print(
-                    f"[zmq-listener] Sent to web app: {response.status_code}"
-                )
-            except Exception as e:
-                print(f"[zmq-listener] Error sending to web app: {e}")
+            # Handle different message types
+            if message.startswith("display-content "):
+                # Extract the actual message content after "display-content "
+                content = message[len("display-content ") :]
+
+                # Send to web app
+                try:
+                    encoded_message = quote(content)
+                    url = f"{WEB_APP_URL}/message?message={encoded_message}"
+                    requests.post(url)
+                    print(
+                        "[zmq-listener] "
+                        "Sent to web app: {response.status_code}"
+                    )
+                except Exception as e:
+                    print(f"[zmq-listener] Error sending to web app: {e}")
+            elif message in ("previous", "next"):
+                # Do nothing for now
+                print(f"[zmq-listener] Ignoring '{message}' command for now")
+            else:
+                print(f"[zmq-listener] Unknown message format: {message}")
 
     except KeyboardInterrupt:
         print("\n[zmq-listener] Shutting down...")

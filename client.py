@@ -19,8 +19,16 @@ def main(message):
     # Give the socket time to establish connection
     time.sleep(0.1)
 
-    socket.send_string(message)
-    click.echo(f"Sent message: {message}")
+    # Format the message based on type
+    if message in ("previous", "next"):
+        # Send navigation commands as-is
+        formatted_message = message
+    else:
+        # Prefix regular messages with "display-content "
+        formatted_message = f"display-content {message}"
+
+    socket.send_string(formatted_message)
+    click.echo(f"Sent message: {formatted_message}")
 
     socket.close()
     context.term()
