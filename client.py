@@ -7,10 +7,23 @@ import zmq
 @click.command()
 @click.option(
     "--message",
-    required=True,
+    "-m",
     help="Message to send to the server",
 )
-def main(message):
+@click.option(
+    "--next",
+    "command",
+    flag_value="next",
+    help="Skip to next track",
+)
+@click.option(
+    "--previous",
+    "-p",
+    "command",
+    flag_value="previous",
+    help="Skip to previous track",
+)
+def main(message, command):
     """Send a message to the ZeroMQ server."""
     context = zmq.Context()
     socket = context.socket(zmq.PUB)
@@ -19,16 +32,21 @@ def main(message):
     # Give the socket time to establish connection
     time.sleep(0.1)
 
-    # Format the message based on type
-    if message in ("previous", "next"):
-        # Send navigation commands as-is
-        formatted_message = message
-    else:
-        # Prefix regular messages with "display-content "
+    # Determine what to send
+    if command:
+        # Navigation command (--next or --previous)
+        formatted_message = command
+    elif message:
+        # Regular message (--message)
         formatted_message = f"display-content {message}"
+    else:
+        click.echo("Error: Must provide either --message, --next, or --previous")
+        socket.close()
+        context.term()
+        return
 
     socket.send_string(formatted_message)
-    click.echo(f"Sent message: {formatted_message}")
+    click.echo(f"Sent: {formatted_message}")
 
     socket.close()
     context.term()

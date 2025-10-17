@@ -9,30 +9,37 @@ WEB_APP_URL = "http://localhost:5000"
 
 # Hardcoded playlist
 PLAYLIST = [
-    {"message": "Taking Back Sunday - MakeDamnSure", "duration": 5},
+    {"message": "1. Taking Back Sunday - MakeDamnSure", "duration": 5},
     {
-        "message": "My Chemical Romance - Welcome to the Black Parade",
+        "message": "2. My Chemical Romance - Welcome to the Black Parade",
         "duration": 6,
     },
-    {"message": "Dashboard Confessional - Vindicated", "duration": 4},
-    {"message": "Fall Out Boy - Sugar, We're Goin Down", "duration": 5},
-    {"message": "Paramore - Misery Business", "duration": 4},
+    {"message": "3. Dashboard Confessional - Vindicated", "duration": 4},
+    {"message": "4. Fall Out Boy - Sugar, We're Goin Down", "duration": 5},
+    {"message": "5. Paramore - Misery Business", "duration": 4},
     {
-        "message": "Brand New - The Quiet Things That No One Ever Knows",
+        "message": "6. Brand New - The Quiet Things That No One Ever Knows",
         "duration": 5,
     },
-    {"message": "The Used - The Taste of Ink", "duration": 4},
+    {"message": "7. The Used - The Taste of Ink", "duration": 4},
     {
-        "message": "Panic! at the Disco - I Write Sins Not Tragedies",
+        "message": "8. Panic! at the Disco - I Write Sins Not Tragedies",
         "duration": 5,
     },
-    {"message": "Jimmy Eat World - The Middle", "duration": 3},
-    {"message": "Yellowcard - Ocean Avenue", "duration": 4},
+    {"message": "9. Jimmy Eat World - The Middle", "duration": 3},
+    {"message": "10. Yellowcard - Ocean Avenue", "duration": 4},
 ]
+
+# Shared state between threads
+playlist_index = 0
+playlist_lock = threading.Lock()
+skip_event = threading.Event()
 
 
 def zmq_listener():
     """Secondary thread that listens for ZeroMQ messages from client."""
+    global playlist_index
+
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
     socket.bind("tcp://127.0.0.1:5555")
@@ -56,16 +63,22 @@ def zmq_listener():
                 try:
                     encoded_message = quote(content)
                     url = f"{WEB_APP_URL}/message?message={encoded_message}"
-                    requests.post(url)
+                    response = requests.post(url)
                     print(
-                        "[zmq-listener] "
-                        "Sent to web app: {response.status_code}"
+                        f"[zmq-listener] Sent to web app: {response.status_code}"
                     )
                 except Exception as e:
                     print(f"[zmq-listener] Error sending to web app: {e}")
-            elif message in ("previous", "next"):
-                # Do nothing for now
-                print(f"[zmq-listener] Ignoring '{message}' command for now")
+            elif message == "next":
+                with playlist_lock:
+                    playlist_index = (playlist_index + 1) % len(PLAYLIST)
+                    print(f"[zmq-listener] Skipped to next (index: {playlist_index})")
+                skip_event.set()
+            elif message == "previous":
+                with playlist_lock:
+                    playlist_index = (playlist_index - 1) % len(PLAYLIST)
+                    print(f"[zmq-listener] Skipped to previous (index: {playlist_index})")
+                skip_event.set()
             else:
                 print(f"[zmq-listener] Unknown message format: {message}")
 
@@ -78,14 +91,16 @@ def zmq_listener():
 
 def playlist_loop():
     """Main thread that loops through the playlist."""
-    print("[playlist] Starting playlist loop...")
+    global playlist_index
 
-    playlist_index = 0
+    print("[playlist] Starting playlist loop...")
 
     try:
         while True:
             # Get current playlist item
-            item = PLAYLIST[playlist_index]
+            with playlist_lock:
+                item = PLAYLIST[playlist_index]
+
             message = item["message"]
             duration = item["duration"]
 
@@ -100,11 +115,15 @@ def playlist_loop():
             except Exception as e:
                 print(f"[playlist] Error sending to web app: {e}")
 
-            # Wait for the duration
-            time.sleep(duration)
-
-            # Move to next item (loop back to start if at end)
-            playlist_index = (playlist_index + 1) % len(PLAYLIST)
+            # Wait for the duration, but can be interrupted by skip event
+            skip_event.clear()
+            if skip_event.wait(timeout=duration):
+                # Skip was triggered, continue immediately to next iteration
+                print("[playlist] Skip detected, moving to next track immediately")
+            else:
+                # Duration elapsed normally, move to next item
+                with playlist_lock:
+                    playlist_index = (playlist_index + 1) % len(PLAYLIST)
 
     except KeyboardInterrupt:
         print("\n[playlist] Shutting down...")
