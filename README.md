@@ -1,6 +1,6 @@
-# Playing with Python Event Loops :fire:
+# Playlist Control
 
-A Python project exploring event loops and asynchronous programming.
+A proof of concept for instant playlist navigation in digital signage systems, demonstrating interruptible playlist playback with real-time web display.
 
 ## Setup
 
@@ -16,6 +16,43 @@ source venv/bin/activate  # On Linux/Mac
 
 # Install dependencies
 pip install -r requirements.txt
+```
+
+## Running the Application
+
+### Start the Web App
+
+First, start the web application server:
+
+```bash
+python web_app.py
+```
+
+The web interface will be available at `http://localhost:5000`
+
+### Start the Playlist Server
+
+In a separate terminal, start the playlist server:
+
+```bash
+python server.py
+```
+
+This will begin cycling through the playlist and sending updates to the web display.
+
+### Send Commands (Optional)
+
+Use the client to send navigation commands:
+
+```bash
+# Skip to next item
+python client.py --next
+
+# Skip to previous item
+python client.py --previous
+
+# Send custom message
+python client.py --message "Your custom message"
 ```
 
 ## Linting & Formatting
